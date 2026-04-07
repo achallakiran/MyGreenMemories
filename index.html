@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Frames</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TOKENS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+:root {
+  --bg:        #0e0c14;
+  --bg2:       #13101e;
+  --amber:     #d4a84b;
+  --amber-dim: rgba(212,168,75,0.18);
+  --violet:    #7c6a9e;
+  --violet-dim:rgba(124,106,158,0.18);
+  --paper:     #ede8d8;
+  --muted:     rgba(237,232,216,0.38);
+  --panel-border: rgba(212,168,75,0.22);
+  --panel-glow:   rgba(212,168,75,0.08);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   RESET / BASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; }
+body {
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 15% 40%, rgba(124,106,158,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 60%, rgba(212,168,75,0.05) 0%, transparent 55%);
+  font-family: 'DM Mono', monospace;
+  display: flex; flex-direction: column; align-items: center;
+  color: var(--paper);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PORTRAIT GUARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#portrait-overlay {
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:var(--bg); flex-direction:column;
+  align-items:center; justify-content:center; gap:18px;
+}
+#portrait-overlay .ri {
+  font-size:3rem;
+  animation: rotatePulse 1.6s ease-in-out infinite alternate;
+}
+@keyframes rotatePulse {
+  from { transform:rotate(0deg) scale(1); }
+  to   { transform:rotate(90deg) scale(1.1); }
+}
+#portrait-overlay p {
+  font-family:'Bebas Neue',cursive;
+  color:var(--amber); font-size:1.1rem; letter-spacing:0.2em; text-align:center;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   HEADER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#app-header {
+  width:100%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  padding:7px 14px 6px;
+  gap:0;
+  border-bottom:1px solid rgba(212,168,75,0.1);
+  position:relative;
+}
+
+/* comic prev/next arrows flanking title */
+.comic-nav-btn {
+  font-family:'Bebas Neue',cursive;
+  font-size:1.4rem; line-height:1;
+  color:var(--muted); background:transparent; border:none;
+  cursor:pointer; padding:2px 10px;
+  transition:color 0.2s, transform 0.15s;
+  user-select:none; flex-shrink:0;
+}
+.comic-nav-btn:hover { color:var(--amber); }
+.comic-nav-btn:active { transform:scale(0.9); }
+.comic-nav-btn:disabled { opacity:0.18; pointer-events:none; }
+
+#comic-title-wrap {
+  display:flex; flex-direction:column; align-items:center;
+  min-width:160px; max-width:40vw;
+  overflow:hidden;
+}
+#comic-title {
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(1.2rem,3vw,1.9rem);
+  color:var(--paper); letter-spacing:0.22em;
+  text-shadow:0 0 18px rgba(212,168,75,0.35), 2px 2px 0 rgba(0,0,0,0.5);
+  line-height:1; white-space:nowrap;
+  transition:opacity 0.25s, letter-spacing 0.25s;
+}
+#comic-index-label {
+  font-size:0.58rem; color:var(--muted);
+  letter-spacing:0.25em; text-transform:uppercase;
+  margin-top:1px;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   VIEWER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#viewer-screen {
+  display:flex; flex-direction:column; align-items:center;
+  width:100%; flex:1; min-height:0;
+  padding:6px 10px 10px; gap:7px;
+}
+
+.comic-stage {
+  position:relative; width:100%; max-width:1280px;
+  flex:1; min-height:0;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* Frame nav arrows — overlaid on image */
+.frame-nav-btn {
+  position:absolute; top:50%; transform:translateY(-50%);
+  z-index:20;
+  width:38px; height:62px;
+  background:rgba(14,12,20,0.45);
+  border:1px solid rgba(212,168,75,0.2);
+  color:var(--paper); font-size:1.6rem;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-family:'Bebas Neue',cursive;
+  transition:all 0.18s; backdrop-filter:blur(6px);
+  user-select:none; border-radius:3px;
+}
+.frame-nav-btn:hover  { background:rgba(212,168,75,0.18); border-color:var(--amber); color:var(--amber); }
+.frame-nav-btn:active { transform:translateY(-50%) scale(0.93); }
+#prev-frame-btn { left:4px; }
+#next-frame-btn { right:4px; }
+
+.panel-wrapper {
+  width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* Main comic panel — sized by JS */
+#comic-panel {
+  position:relative; flex-shrink:0;
+  background:#000;
+  /* Double border: outer dark, inner amber */
+  border:2px solid rgba(212,168,75,0.28);
+  outline:1px solid rgba(0,0,0,0.8);
+  outline-offset:3px;
+  box-shadow:
+    0 0 0 4px rgba(0,0,0,0.6),
+    0 0 30px rgba(212,168,75,0.06),
+    0 16px 50px rgba(0,0,0,0.7);
+  overflow:hidden;
+  transition:box-shadow 0.6s ease, border-color 0.6s ease;
+}
+
+/* Loop-active glow pulse */
+#comic-panel.in-loop {
+  border-color:rgba(212,168,75,0.55);
+  box-shadow:
+    0 0 0 4px rgba(0,0,0,0.6),
+    0 0 28px rgba(212,168,75,0.22),
+    0 0 60px rgba(124,106,158,0.12),
+    0 16px 50px rgba(0,0,0,0.7);
+  animation:loopPulse 2.2s ease-in-out infinite;
+}
+@keyframes loopPulse {
+  0%,100% { box-shadow: 0 0 0 4px rgba(0,0,0,0.6), 0 0 20px rgba(212,168,75,0.15), 0 16px 50px rgba(0,0,0,0.7); }
+  50%      { box-shadow: 0 0 0 4px rgba(0,0,0,0.6), 0 0 40px rgba(212,168,75,0.32), 0 0 70px rgba(124,106,158,0.18), 0 16px 50px rgba(0,0,0,0.7); }
+}
+
+/* Vignette */
+#comic-panel::before {
+  content:''; position:absolute; inset:0; z-index:5;
+  background:radial-gradient(ellipse at center, transparent 52%, rgba(5,3,10,0.6) 100%);
+  pointer-events:none;
+}
+
+/* Hue-rotate shimmer during loop sections */
+#comic-panel.in-loop .panel-img.active {
+  animation:hueShimmer 4s linear infinite;
+}
+@keyframes hueShimmer {
+  0%   { filter:hue-rotate(0deg); }
+  50%  { filter:hue-rotate(14deg) saturate(1.1); }
+  100% { filter:hue-rotate(0deg); }
+}
+
+.panel-img {
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:contain; display:block;
+  opacity:0; transition:opacity 0.32s ease;
+}
+.panel-img.active  { opacity:1; }
+.panel-img.leaving { opacity:0; }
+
+/* Canvas layers */
+#grain-canvas {
+  position:absolute; inset:0; width:100%; height:100%;
+  mix-blend-mode:screen; pointer-events:none; z-index:6; display:none;
+}
+#grain-canvas.active { display:block; }
+
+#color-grade {
+  position:absolute; inset:0; z-index:4; pointer-events:none; display:none;
+  background:linear-gradient(155deg,
+    rgba(212,168,75,0.11) 0%,
+    rgba(180,130,40,0.08) 50%,
+    rgba(124,106,158,0.06) 100%);
+  mix-blend-mode:multiply;
+}
+#color-grade.active { display:block; }
+
+#smoke-canvas {
+  position:absolute; inset:0; width:100%; height:100%;
+  pointer-events:none; z-index:7; display:none;
+}
+#smoke-canvas.active { display:block; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   BOTTOM CONTROLS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#controls-bar {
+  width:100%; max-width:1280px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:0 2px;
+}
+
+/* Frosted pill for button groups */
+.ctrl-pill {
+  display:flex; align-items:center; gap:5px;
+  background:rgba(14,12,20,0.6);
+  border:1px solid rgba(212,168,75,0.14);
+  border-radius:20px;
+  padding:4px 10px;
+  backdrop-filter:blur(10px);
+  flex-shrink:0;
+}
+
+.frame-counter {
+  font-family:'Bebas Neue',cursive;
+  font-size:1rem; letter-spacing:0.2em;
+  color:var(--paper); min-width:54px; text-align:center;
+}
+.dir-dot {
+  width:5px; height:5px; border-radius:50%;
+  background:var(--amber); opacity:0.5;
+  transition:opacity 0.2s, transform 0.2s;
+}
+.dir-dot.rev { background:var(--violet); opacity:0.7; transform:scale(1.3); }
+
+/* Dots strip */
+#dots-strip {
+  flex:1; min-width:0;
+  display:flex; align-items:center; justify-content:center;
+  gap:5px; flex-wrap:wrap;
+  padding:2px 8px;
+}
+.dot {
+  width:6px; height:6px;
+  border:1.5px solid rgba(212,168,75,0.3);
+  border-radius:50%; cursor:pointer;
+  transition:all 0.22s; flex-shrink:0;
+}
+.dot.active {
+  background:var(--amber); border-color:var(--amber);
+  box-shadow:0 0 6px rgba(212,168,75,0.55);
+  transform:scale(1.35);
+}
+.dot.in-loop-range {
+  border-color:rgba(124,106,158,0.55);
+  box-shadow:0 0 4px rgba(124,106,158,0.3);
+}
+.dot.in-loop-range.active {
+  background:var(--violet); border-color:var(--violet);
+  box-shadow:0 0 7px rgba(124,106,158,0.6);
+}
+.dot:hover { border-color:var(--amber); }
+
+/* Control buttons */
+.ctrl-btn {
+  font-size:1.05rem;
+  width:32px; height:32px;
+  display:flex; align-items:center; justify-content:center;
+  background:transparent;
+  border:1px solid rgba(212,168,75,0.15);
+  color:var(--muted); border-radius:50%;
+  cursor:pointer; transition:all 0.2s;
+  flex-shrink:0; line-height:1;
+}
+.ctrl-btn:hover  { border-color:var(--amber); color:var(--amber); background:var(--amber-dim); }
+.ctrl-btn.on {
+  border-color:var(--amber); color:var(--amber);
+  background:var(--amber-dim);
+  box-shadow:0 0 10px rgba(212,168,75,0.25);
+}
+.ctrl-btn.smoke-on {
+  border-color:rgba(200,200,200,0.4); color:rgba(220,220,200,0.8);
+  background:rgba(200,200,200,0.08);
+  box-shadow:0 0 10px rgba(200,200,200,0.15);
+}
+
+/* Speed slider in pill */
+.speed-wrap {
+  overflow:hidden; max-width:0; opacity:0;
+  transition:max-width 0.3s ease, opacity 0.3s ease;
+}
+.speed-wrap.visible { max-width:70px; opacity:1; }
+input[type=range].spd {
+  width:60px; height:2px;
+  accent-color:var(--amber); cursor:pointer;
+  display:block;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CALIBRATION UI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#calibrate-ui {
+  display:none; position:fixed; inset:0; z-index:1000;
+  flex-direction:column; align-items:center;
+  background:var(--bg);
+}
+#calibrate-ui.active { display:flex; }
+
+#cal-header {
+  width:100%; padding:8px 16px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid rgba(212,168,75,0.12);
+  gap:10px;
+}
+.cal-hd-label {
+  font-family:'Bebas Neue',cursive; color:var(--amber);
+  font-size:0.95rem; letter-spacing:0.18em;
+}
+#cal-comic-select {
+  font-family:'DM Mono',monospace; font-size:0.78rem;
+  background:rgba(212,168,75,0.08); color:var(--paper);
+  border:1px solid rgba(212,168,75,0.25); border-radius:3px;
+  padding:4px 8px; cursor:pointer; outline:none;
+}
+#cal-comic-select option { background:var(--bg2); }
+#cal-frame-lbl {
+  font-family:'Bebas Neue',cursive; color:var(--paper);
+  font-size:1rem; letter-spacing:0.12em; min-width:90px; text-align:right;
+}
+.cal-btn {
+  font-family:'Bebas Neue',cursive; font-size:0.88rem;
+  letter-spacing:0.1em; padding:5px 14px;
+  border:none; border-radius:2px; cursor:pointer;
+}
+#cal-skip-btn { background:transparent; color:var(--muted); border:1px solid rgba(212,168,75,0.2); }
+#cal-next-btn { background:var(--amber); color:var(--bg); margin-left:6px; }
+
+#cal-img-wrap {
+  flex:1; width:100%; min-height:0; position:relative;
+  cursor:crosshair; display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+}
+#cal-img { max-width:100%; max-height:100%; object-fit:contain; display:block; pointer-events:none; }
+
+#cal-pin {
+  position:absolute; display:none; width:22px; height:22px;
+  transform:translate(-50%,-50%); pointer-events:none;
+}
+#cal-pin::before,#cal-pin::after { content:''; position:absolute; background:rgba(212,168,75,0.9); }
+#cal-pin::before { width:1.5px; height:100%; left:50%; transform:translateX(-50%); }
+#cal-pin::after  { width:100%; height:1.5px; top:50%; transform:translateY(-50%); }
+.pin-ring { position:absolute; inset:3px; border:1.5px solid rgba(212,168,75,0.5); border-radius:50%; }
+
+#cal-footer {
+  width:100%; padding:7px 16px; flex-shrink:0;
+  display:flex; align-items:center;
+  justify-content:space-between; flex-wrap:wrap; gap:7px;
+  border-top:1px solid rgba(212,168,75,0.1);
+}
+#cal-coords { font-size:0.75rem; color:rgba(212,168,75,0.65); letter-spacing:0.05em; }
+#cal-output-box {
+  width:100%; background:rgba(0,0,0,0.4);
+  border:1px solid rgba(212,168,75,0.18); border-radius:3px;
+  padding:9px 13px;
+  font-size:0.74rem; color:rgba(237,232,216,0.8);
+  white-space:pre; overflow-x:auto; display:none;
+}
+#cal-output-box.visible { display:block; }
+#cal-copy-btn {
+  font-family:'Bebas Neue',cursive; font-size:0.82rem; letter-spacing:0.1em;
+  padding:5px 13px; background:var(--amber-dim);
+  border:1px solid var(--amber); color:var(--paper);
+  border-radius:2px; cursor:pointer; display:none;
+}
+#cal-copy-btn.visible { display:block; }
+#cal-hint { font-size:0.64rem; color:rgba(212,168,75,0.28); letter-spacing:0.06em; width:100%; }
+</style>
+</head>
+<body>
+
+<!-- Portrait guard -->
+<div id="portrait-overlay">
+  <div class="ri">&#128241;</div>
+  <p>Rotate to landscape</p>
+</div>
+
+<!-- Calibration UI -->
+<div id="calibrate-ui">
+  <div id="cal-header">
+    <span class="cal-hd-label">&#128168; Smoke Calibrator</span>
+    <select id="cal-comic-select" onchange="calComicChanged()"></select>
+    <span id="cal-frame-lbl">Frame 1 / —</span>
+    <div>
+      <button id="cal-skip-btn" class="cal-btn" onclick="calSkip()">Skip</button>
+      <button id="cal-next-btn" class="cal-btn" onclick="calNext()">Next</button>
+    </div>
+  </div>
+  <div id="cal-img-wrap">
+    <img id="cal-img" src="" alt="">
+    <div id="cal-pin"><div class="pin-ring"></div></div>
+  </div>
+  <div id="cal-footer">
+    <span id="cal-coords">Tap the cigarette tip in the image above</span>
+    <button id="cal-copy-btn" onclick="calCopy()">Copy Config</button>
+    <div id="cal-output-box"></div>
+    <div id="cal-hint">Coordinates are stored as % of image content — correct on all screen sizes</div>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="app-header">
+  <button class="comic-nav-btn" id="comic-prev-btn" onclick="switchComic(-1)">&#8249;</button>
+  <div id="comic-title-wrap">
+    <div id="comic-title">—</div>
+    <div id="comic-index-label">— / —</div>
+  </div>
+  <button class="comic-nav-btn" id="comic-next-btn" onclick="switchComic(1)">&#8250;</button>
+</div>
+
+<div id="viewer-screen">
+  <div class="comic-stage">
+    <button class="frame-nav-btn" id="prev-frame-btn" onclick="nudge(-1)">&#8249;</button>
+    <div class="panel-wrapper">
+      <div id="comic-panel">
+        <canvas id="grain-canvas"></canvas>
+        <div id="color-grade"></div>
+        <canvas id="smoke-canvas"></canvas>
+      </div>
+    </div>
+    <button class="frame-nav-btn" id="next-frame-btn" onclick="nudge(1)">&#8250;</button>
+  </div>
+
+  <div id="controls-bar">
+    <!-- Left pill: counter + direction -->
+    <div class="ctrl-pill">
+      <div class="frame-counter" id="frame-counter">1/1</div>
+      <div class="dir-dot" id="dir-dot"></div>
+    </div>
+
+    <!-- Centre: dot strip -->
+    <div id="dots-strip"></div>
+
+    <!-- Right pill: global + per-comic buttons -->
+    <div class="ctrl-pill" id="right-pill">
+      <!-- Loop -->
+      <button class="ctrl-btn" id="loop-btn" onclick="toggleLoop()" title="Boomerang loop">&#10227;</button>
+      <div class="speed-wrap" id="speed-wrap">
+        <input type="range" class="spd" id="speed-slider" min="300" max="2500" value="900" step="100">
+      </div>
+      <!-- Film filter -->
+      <button class="ctrl-btn" id="film-btn" onclick="toggleFilm()" title="Film filter">&#127902;</button>
+      <!-- Smoke — injected per comic if applicable -->
+      <button class="ctrl-btn" id="smoke-btn" onclick="toggleSmoke()" title="Smoke" style="display:none">&#128168;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+//
+//  ███████╗ ██████╗ ███╗   ██╗███████╗██╗ ██████╗
+//  ██╔════╝██╔═══██╗████╗  ██║██╔════╝██║██╔════╝
+//  ██║     ██║   ██║██╔██╗ ██║█████╗  ██║██║  ███╗
+//  ██║     ██║   ██║██║╚██╗██║██╔══╝  ██║██║   ██║
+//  ╚██████╗╚██████╔╝██║ ╚████║██║     ██║╚██████╔╝
+//   ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝
+//
+//  ★ EDIT THIS BLOCK TO ADD / MODIFY COMICS ★
+//
+//  images     — filenames relative to this HTML file
+//  loops      — sub-loop definitions:
+//                 start  = 0-based index into `images` where loop begins
+//                 end    = 0-based index (inclusive) where loop ends
+//                 count  = how many times the loop segment repeats in full
+//                          (count:2 means the segment plays 2 extra times = 3 total)
+//  buttons    — optional per-comic buttons. Supported values: 'smoke'
+//  smokeFrames— smoke origins per expanded-sequence index (use ?calibrate to generate)
+//                 frame  = index in the EXPANDED sequence (after loops are unrolled)
+//                 x, y   = fraction of image content 0..1
+//
+// ═══════════════════════════════════════════════════════════════════════
+var COMICS_CONFIG = [
+  {
+    id:    'the-pass',
+    title: 'The Pass',
+    images: ['pass_1.png','pass_2.png','pass_3.png','pass_4.png','pass_5.png'],
+    loops:  [],          // e.g. { start:2, end:4, count:2 }
+    buttons: ['smoke'],
+    smokeFrames: [
+      // Paste calibrated values here after running ?calibrate
+      // e.g. { frame:0, x:0.48, y:0.71 }
+    ]
+  },
+  {
+    id:    'the-high',
+    title: 'The High',
+    images: [
+      'high_1.png','high_2.png','high_3.png',
+      'high_4.png','high_5.png','high_6.png','high_7.png', 'high_8.png'
+    ],
+    loops: [
+      { start:6, end:8, count:2 }   // frames 3-6 loop twice extra (plays 3× total)
+    ],
+    buttons: [],
+    smokeFrames: []
+  }
+];
+// ═══════════════════════════════════════════════════════════════════════
+//  END CONFIG
+// ═══════════════════════════════════════════════════════════════════════
+
+
+// ── RUNTIME STATE ──
+var comicIdx      = 0;   // which comic is active
+var sequence      = [];  // expanded frame sequence (image indices), built per comic
+var loopRanges    = [];  // [{seqStart, seqEnd}] — which seq positions are in a loop
+var seqIdx        = 0;   // current position in sequence
+var direction     = 1;
+var transitioning = false;
+var looping       = false;
+var loopTimer     = null;
+var filmMode      = false;
+var smokeMode     = false;
+var grainAnim     = null;
+var smokeAnim     = null;
+var smokeParticles = [];
+
+// ── LANDSCAPE ──
+(function(){
+  if (screen.orientation && screen.orientation.lock)
+    screen.orientation.lock('landscape').catch(function(){});
+  function check(){
+    var p = window.innerHeight > window.innerWidth;
+    document.getElementById('portrait-overlay').style.display = p ? 'flex' : 'none';
+  }
+  window.addEventListener('resize', check);
+  window.addEventListener('orientationchange', check);
+  check();
+})();
+
+// ── PANEL SIZING — explicit pixels, 16:10 ──
+function sizePanel(){
+  var stage = document.querySelector('.comic-stage');
+  var panel = document.getElementById('comic-panel');
+  if (!stage||!panel) return;
+  var sw=stage.offsetWidth, sh=stage.offsetHeight;
+  if (sw<10||sh<10) return;
+  var ratio=16/10, w, h;
+  if (sw/sh>ratio){ h=sh; w=h*ratio; } else { w=sw; h=w/ratio; }
+  panel.style.width  = Math.floor(w)+'px';
+  panel.style.height = Math.floor(h)+'px';
+}
+window.addEventListener('resize', function(){
+  sizePanel();
+  if (filmMode||smokeMode) resizeCanvases();
+});
+
+// ── BOOT ──
+(function(){
+  var isCalibrate = location.search.indexOf('calibrate') !== -1;
+  if (isCalibrate){ initCalibrate(); }
+  else             { loadComic(0); }
+})();
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SEQUENCE ENGINE
+//  Expands loops into a flat array of image indices.
+//  Also records which positions in the sequence are inside a loop range.
+// ═══════════════════════════════════════════════════════════════════════
+function buildSequence(comic){
+  var imgs   = comic.images;
+  var loops  = comic.loops || [];
+  var seq    = [];
+  var ranges = [];  // [{start,end}] in seq indices
+
+  // Build a map: imgIdx -> {loopDef} or null
+  // We process linearly: for each image position, check if it's the start of a loop
+  var i = 0;
+  while (i < imgs.length){
+    // Check if any loop starts here
+    var loopHere = null;
+    for (var l=0;l<loops.length;l++){
+      if (loops[l].start === i){ loopHere = loops[l]; break; }
+    }
+    if (loopHere){
+      // Insert the loop segment (count+1) times total
+      var total = (loopHere.count||1) + 1;
+      var segStart = seq.length;
+      for (var rep=0; rep<total; rep++){
+        for (var j=loopHere.start; j<=loopHere.end; j++){
+          seq.push(j);
+        }
+      }
+      ranges.push({ start:segStart, end:seq.length-1 });
+      // Advance i past the loop segment
+      i = loopHere.end + 1;
+    } else {
+      seq.push(i);
+      i++;
+    }
+  }
+  return { seq:seq, ranges:ranges };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  COMIC LOADER
+// ═══════════════════════════════════════════════════════════════════════
+function loadComic(idx){
+  // Stop any running effects
+  stopLooping();
+  if (filmMode)  toggleFilm();
+  if (smokeMode) toggleSmoke();
+
+  comicIdx  = idx;
+  seqIdx    = 0;
+  direction = 1;
+  transitioning = false;
+
+  var comic = COMICS_CONFIG[idx];
+  var built = buildSequence(comic);
+  sequence   = built.seq;
+  loopRanges = built.ranges;
+
+  // Update header
+  var titleEl = document.getElementById('comic-title');
+  titleEl.style.opacity='0'; titleEl.style.letterSpacing='0.35em';
+  setTimeout(function(){
+    titleEl.textContent = comic.title;
+    titleEl.style.opacity='1'; titleEl.style.letterSpacing='0.22em';
+  }, 200);
+  document.getElementById('comic-index-label').textContent =
+    (idx+1)+' / '+COMICS_CONFIG.length;
+
+  // Prev/next comic buttons
+  document.getElementById('comic-prev-btn').disabled = (idx===0);
+  document.getElementById('comic-next-btn').disabled = (idx===COMICS_CONFIG.length-1);
+
+  // Smoke button visibility
+  var hasSmoke = (comic.buttons||[]).indexOf('smoke') !== -1;
+  document.getElementById('smoke-btn').style.display = hasSmoke ? 'flex' : 'none';
+
+  // Build panel images
+  var panel = document.getElementById('comic-panel');
+  panel.querySelectorAll('.panel-img').forEach(function(el){ el.remove(); });
+
+  // Only unique image files needed
+  var uniqueImgs = comic.images;
+  uniqueImgs.forEach(function(src, i){
+    var el = document.createElement('img');
+    el.src = src;
+    el.className = 'panel-img';
+    el.dataset.imgIdx = i;
+    el.alt = comic.title+' frame '+(i+1);
+    panel.insertBefore(el, document.getElementById('grain-canvas'));
+  });
+
+  // Show first frame
+  showSeqFrame(0, false);
+  buildDots();
+  updateUI();
+
+  setTimeout(function(){ sizePanel(); resizeCanvases(); }, 0);
+}
+
+function switchComic(dir){
+  var next = comicIdx + dir;
+  if (next<0||next>=COMICS_CONFIG.length) return;
+  loadComic(next);
+}
+
+// ─── Show the frame at seqIdx position ───
+function showSeqFrame(newSeqIdx, animate){
+  var panel = document.getElementById('comic-panel');
+  var imgs  = panel.querySelectorAll('.panel-img');
+
+  // Deactivate current
+  if (animate){
+    var oldImgIdx = sequence[seqIdx];
+    if (imgs[oldImgIdx]) imgs[oldImgIdx].classList.add('leaving');
+    if (imgs[oldImgIdx]) imgs[oldImgIdx].classList.remove('active');
+  } else {
+    imgs.forEach(function(el){
+      el.classList.remove('active','leaving');
+    });
+  }
+
+  seqIdx = newSeqIdx;
+  var newImgIdx = sequence[seqIdx];
+
+  requestAnimationFrame(function(){
+    if (imgs[newImgIdx]) imgs[newImgIdx].classList.add('active');
+  });
+
+  if (animate){
+    var old = sequence[seqIdx > 0 ? seqIdx-1 : seqIdx]; // approx
+    setTimeout(function(){
+      imgs.forEach(function(el){ el.classList.remove('leaving'); });
+      transitioning = false;
+    }, 360);
+  }
+
+  // Loop zone glow
+  var inLoop = isInLoop(newSeqIdx);
+  panel.classList.toggle('in-loop', inLoop);
+
+  updateUI();
+}
+
+function isInLoop(si){
+  for (var i=0;i<loopRanges.length;i++){
+    if (si>=loopRanges[i].start && si<=loopRanges[i].end) return true;
+  }
+  return false;
+}
+
+// ─── Navigation ───
+function nudge(pressDir){
+  if (transitioning || sequence.length<2) return;
+  var last = sequence.length-1;
+  if      (seqIdx===0)    { direction=1;         goToSeq(1); }
+  else if (seqIdx===last) { direction=-1;         goToSeq(last-1); }
+  else                    { direction=pressDir;   goToSeq(seqIdx+direction); }
+}
+
+function goToSeq(newIdx){
+  if (newIdx<0||newIdx>=sequence.length||newIdx===seqIdx||transitioning) return;
+  transitioning = true;
+
+  var panel = document.getElementById('comic-panel');
+  var imgs  = panel.querySelectorAll('.panel-img');
+
+  var oldImgIdx = sequence[seqIdx];
+  imgs[oldImgIdx].classList.add('leaving');
+  imgs[oldImgIdx].classList.remove('active');
+  var prev = seqIdx;
+  seqIdx = newIdx;
+  var newImgIdx = sequence[seqIdx];
+
+  requestAnimationFrame(function(){ imgs[newImgIdx].classList.add('active'); });
+  setTimeout(function(){
+    imgs[oldImgIdx].classList.remove('leaving');
+    transitioning = false;
+  }, 360);
+
+  var inLoop = isInLoop(newIdx);
+  panel.classList.toggle('in-loop', inLoop);
+
+  updateUI();
+}
+
+// ─── UI ───
+function buildDots(){
+  var strip = document.getElementById('dots-strip');
+  strip.innerHTML='';
+  sequence.forEach(function(imgIdx, si){
+    var dot = document.createElement('div');
+    var inL = isInLoop(si);
+    dot.className = 'dot' + (si===0?' active':'') + (inL?' in-loop-range':'');
+    (function(i){ dot.onclick = function(){ goToSeq(i); }; })(si);
+    strip.appendChild(dot);
+  });
+}
+
+function updateUI(){
+  document.getElementById('frame-counter').textContent =
+    (seqIdx+1)+'/'+sequence.length;
+  var dd = document.getElementById('dir-dot');
+  dd.classList.toggle('rev', direction===-1);
+
+  document.querySelectorAll('#dots-strip .dot').forEach(function(d,i){
+    d.classList.toggle('active', i===seqIdx);
+  });
+}
+
+// ─── Loop / Boomerang ───
+function toggleLoop(){
+  looping = !looping;
+  document.getElementById('loop-btn').classList.toggle('on', looping);
+  document.getElementById('speed-wrap').classList.toggle('visible', looping);
+  if (looping) scheduleLoop();
+  else stopLooping();
+}
+function stopLooping(){ looping=false; clearTimeout(loopTimer); loopTimer=null; }
+function scheduleLoop(){
+  if (!looping) return;
+  var spd = parseInt(document.getElementById('speed-slider').value);
+  loopTimer = setTimeout(function(){ loopStep(); scheduleLoop(); }, spd);
+}
+function loopStep(){
+  if (transitioning) return;
+  var last = sequence.length-1;
+  if      (seqIdx===last && direction===1)  direction=-1;
+  else if (seqIdx===0    && direction===-1) direction=1;
+  goToSeq(seqIdx+direction);
+}
+
+// ─── Film Filter ───
+function toggleFilm(){
+  filmMode = !filmMode;
+  document.getElementById('film-btn').classList.toggle('on', filmMode);
+  document.getElementById('color-grade').classList.toggle('active', filmMode);
+  var panel = document.getElementById('comic-panel');
+  if (filmMode){
+    resizeCanvases();
+    document.getElementById('grain-canvas').classList.add('active');
+    startFilmAnim();
+  } else {
+    document.getElementById('grain-canvas').classList.remove('active');
+    stopFilmAnim();
+    panel.style.filter=''; panel.style.transform='';
+  }
+}
+
+function startFilmAnim(){
+  var canvas=document.getElementById('grain-canvas');
+  var ctx=canvas.getContext('2d');
+  var panel=document.getElementById('comic-panel');
+  var frame=0, flicker=1.0, jitter=0, scratches=[];
+  function tick(){
+    if (!filmMode) return;
+    frame++;
+    var w=canvas.width,h=canvas.height;
+    var id=ctx.createImageData(w,h); var d=id.data;
+    for (var i=0;i<d.length;i+=4){
+      if (Math.random()>0.28){ d[i+3]=0; continue; }
+      var b=(105+Math.random()*75)|0;
+      d[i]=Math.min(255,b+25); d[i+1]=Math.min(255,b+12);
+      d[i+2]=Math.max(0,b-15); d[i+3]=(25+Math.random()*18)|0;
+    }
+    ctx.putImageData(id,0,0);
+    if (Math.random()<0.013) scratches.push({
+      x:Math.random()*w, w:Math.random()*0.7+0.2,
+      a:0.15+Math.random()*0.2, life:0, ml:Math.floor(Math.random()*5+2)
+    });
+    scratches=scratches.filter(function(s){ return s.life<s.ml; });
+    scratches.forEach(function(s){
+      ctx.save(); ctx.globalAlpha=s.a*(1-s.life/s.ml);
+      ctx.strokeStyle='rgba(212,180,100,1)'; ctx.lineWidth=s.w;
+      ctx.beginPath(); ctx.moveTo(s.x,0);
+      ctx.lineTo(s.x+(Math.random()-0.5)*2,h);
+      ctx.stroke(); ctx.restore(); s.life++;
+    });
+    if (frame%48===0) flicker=0.94+Math.random()*0.09;
+    else flicker+=(1-flicker)*0.16;
+    if (Math.random()<0.003) jitter=(Math.random()-0.5)*1.6;
+    else jitter*=0.5;
+    panel.style.filter='contrast(1.07) saturate(0.87) sepia(0.2) brightness('+flicker.toFixed(3)+')';
+    panel.style.transform='translateY('+jitter.toFixed(2)+'px)';
+    grainAnim=requestAnimationFrame(tick);
+  }
+  tick();
+}
+function stopFilmAnim(){
+  if (grainAnim){ cancelAnimationFrame(grainAnim); grainAnim=null; }
+  var c=document.getElementById('grain-canvas');
+  c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
+
+// ─── Smoke ───
+function toggleSmoke(){
+  smokeMode=!smokeMode;
+  var btn=document.getElementById('smoke-btn');
+  btn.classList.toggle('smoke-on', smokeMode);
+  var sc=document.getElementById('smoke-canvas');
+  if (smokeMode){
+    resizeCanvases(); sc.classList.add('active');
+    smokeParticles=[]; startSmokeAnim();
+  } else {
+    sc.classList.remove('active'); stopSmokeAnim();
+    sc.getContext('2d').clearRect(0,0,sc.width,sc.height);
+  }
+}
+
+function getSmokeOrigin(canvas){
+  var comic = COMICS_CONFIG[comicIdx];
+  var frames = comic.smokeFrames || [];
+  var pt = null;
+  for (var i=0;i<frames.length;i++){
+    if (frames[i].frame===seqIdx){ pt=frames[i]; break; }
+  }
+  if (!pt) return null;
+
+  var panel=document.getElementById('comic-panel');
+  var pw=panel.offsetWidth||canvas.width;
+  var ph=panel.offsetHeight||canvas.height;
+  var imgs=panel.querySelectorAll('.panel-img');
+  var img=imgs[sequence[seqIdx]];
+  if (!img||!img.naturalWidth) return null;
+  var nw=img.naturalWidth, nh=img.naturalHeight;
+  var pr=pw/ph, ir=nw/nh;
+  var rw,rh,ox,oy;
+  if (ir>pr){ rw=pw; rh=pw/ir; ox=0; oy=(ph-rh)/2; }
+  else      { rh=ph; rw=ph*ir; ox=(pw-rw)/2; oy=0; }
+  return { x:ox+pt.x*rw, y:oy+pt.y*rh };
+}
+
+function startSmokeAnim(){
+  var canvas=document.getElementById('smoke-canvas');
+  var ctx=canvas.getContext('2d');
+  function spawn(ox,oy){
+    smokeParticles.push({
+      x:ox+(Math.random()-0.5)*6, y:oy,
+      vx:(Math.random()-0.5)*0.24, vy:-(0.24+Math.random()*0.30),
+      r:1.8+Math.random()*2.4, alpha:0.11+Math.random()*0.085,
+      life:0, maxLife:90+Math.floor(Math.random()*60),
+      dr:0.036+Math.random()*0.048
+    });
+  }
+  function tick(){
+    if (!smokeMode) return;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    var o=getSmokeOrigin(canvas);
+    if (o&&Math.random()<0.33) spawn(o.x,o.y);
+    smokeParticles=smokeParticles.filter(function(p){ return p.life<p.maxLife; });
+    smokeParticles.forEach(function(p){
+      var prog=p.life/p.maxLife, a;
+      if      (prog<0.15) a=p.alpha*(prog/0.15);
+      else if (prog>0.60) a=p.alpha*(1-(prog-0.60)/0.40);
+      else                 a=p.alpha;
+      var r=p.r+p.dr*p.life;
+      var g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+      g.addColorStop(0,'rgba(220,210,195,'+a+')');
+      g.addColorStop(0.5,'rgba(200,190,175,'+(a*0.6)+')');
+      g.addColorStop(1,'rgba(180,170,155,0)');
+      ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
+      ctx.fillStyle=g; ctx.fill();
+      p.vx+=Math.sin(p.life*0.09)*0.025;
+      p.x+=p.vx; p.y+=p.vy; p.vy*=0.995; p.life++;
+    });
+    smokeAnim=requestAnimationFrame(tick);
+  }
+  tick();
+}
+function stopSmokeAnim(){
+  if (smokeAnim){ cancelAnimationFrame(smokeAnim); smokeAnim=null; }
+  smokeParticles=[];
+}
+
+// ─── Canvas resize ───
+function resizeCanvases(){
+  var panel=document.getElementById('comic-panel');
+  var w=panel.offsetWidth||800, h=panel.offsetHeight||500;
+  ['grain-canvas','smoke-canvas'].forEach(function(id){
+    var c=document.getElementById(id); c.width=w; c.height=h;
+  });
+}
+
+// ─── Keyboard ───
+document.addEventListener('keydown', function(e){
+  if (e.key==='ArrowRight') nudge(1);
+  if (e.key==='ArrowLeft')  nudge(-1);
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CALIBRATION  (?calibrate in URL)
+//  Shows each image of selected comic, user taps cigarette tip.
+//  Outputs a ready-to-paste smokeFrames array.
+// ═══════════════════════════════════════════════════════════════════════
+var calComicIdx = 0;
+var calFrameIdx = 0;
+var calSeq      = [];
+var calResults  = [];
+
+function initCalibrate(){
+  document.getElementById('app-header').style.display='none';
+  document.getElementById('viewer-screen').style.display='none';
+  document.getElementById('calibrate-ui').classList.add('active');
+
+  // Populate comic selector
+  var sel = document.getElementById('cal-comic-select');
+  COMICS_CONFIG.forEach(function(c,i){
+    var opt=document.createElement('option');
+    opt.value=i; opt.textContent=c.title; sel.appendChild(opt);
+  });
+
+  document.getElementById('cal-img-wrap').addEventListener('click', onCalTap);
+  calStartComic(0);
+}
+
+function calComicChanged(){
+  var idx = parseInt(document.getElementById('cal-comic-select').value);
+  calStartComic(idx);
+}
+
+function calStartComic(idx){
+  calComicIdx = idx;
+  var built = buildSequence(COMICS_CONFIG[idx]);
+  calSeq = built.seq;
+  calResults = [];
+  calSeq.forEach(function(){ calResults.push(null); });
+  // Hide output
+  document.getElementById('cal-output-box').classList.remove('visible');
+  document.getElementById('cal-copy-btn').classList.remove('visible');
+  document.getElementById('cal-next-btn').style.display='';
+  document.getElementById('cal-skip-btn').style.display='';
+  calLoadFrame(0);
+}
+
+function calLoadFrame(idx){
+  if (idx>=calSeq.length){ calShowResults(); return; }
+  calFrameIdx = idx;
+  var imgFile = COMICS_CONFIG[calComicIdx].images[calSeq[idx]];
+  document.getElementById('cal-img').src = imgFile;
+  document.getElementById('cal-frame-lbl').textContent =
+    'Frame '+(idx+1)+' / '+calSeq.length;
+  document.getElementById('cal-next-btn').textContent =
+    idx<calSeq.length-1 ? 'Next' : 'Done';
+  document.getElementById('cal-coords').textContent = 'Tap the cigarette tip';
+
+  var prev = calResults[idx];
+  if (prev) calShowPin(prev.rawX,prev.rawY); else calHidePin();
+}
+
+function onCalTap(e){
+  if (calFrameIdx>=calSeq.length) return;
+  var wrap=document.getElementById('cal-img-wrap');
+  var img=document.getElementById('cal-img');
+  var wr=wrap.getBoundingClientRect();
+  var ir=img.getBoundingClientRect();
+  var tx=e.clientX-wr.left, ty=e.clientY-wr.top;
+  var il=ir.left-wr.left, it=ir.top-wr.top;
+  var cx=Math.max(0,Math.min(ir.width,tx-il));
+  var cy=Math.max(0,Math.min(ir.height,ty-it));
+  var fx=+(cx/ir.width).toFixed(4);
+  var fy=+(cy/ir.height).toFixed(4);
+  calResults[calFrameIdx]={frame:calFrameIdx, x:fx, y:fy, rawX:tx, rawY:ty};
+  calShowPin(tx,ty);
+  document.getElementById('cal-coords').textContent='x: '+fx.toFixed(3)+'  y: '+fy.toFixed(3);
+}
+
+function calShowPin(px,py){
+  var pin=document.getElementById('cal-pin');
+  pin.style.display='block'; pin.style.left=px+'px'; pin.style.top=py+'px';
+}
+function calHidePin(){ document.getElementById('cal-pin').style.display='none'; }
+function calNext()   { calLoadFrame(calFrameIdx+1); }
+function calSkip()   { calResults[calFrameIdx]=null; calHidePin(); calLoadFrame(calFrameIdx+1); }
+
+function calShowResults(){
+  var lines = calResults
+    .filter(function(r){ return r!==null; })
+    .map(function(r){
+      return '      { frame:'+r.frame+', x:'+r.x+', y:'+r.y+' }';
+    });
+  var block = '    smokeFrames: [\n'+lines.join(',\n')+'\n    ]';
+
+  var box=document.getElementById('cal-output-box');
+  box.textContent=block; box.classList.add('visible');
+  document.getElementById('cal-copy-btn').classList.add('visible');
+  document.getElementById('cal-frame-lbl').textContent='All done';
+  document.getElementById('cal-next-btn').style.display='none';
+  document.getElementById('cal-skip-btn').style.display='none';
+  document.getElementById('cal-coords').textContent=
+    'Paste the block above into the smokeFrames field of "'+COMICS_CONFIG[calComicIdx].title+'" in COMICS_CONFIG.';
+  calHidePin();
+}
+
+function calCopy(){
+  var text=document.getElementById('cal-output-box').textContent;
+  if (navigator.clipboard){
+    navigator.clipboard.writeText(text).then(function(){
+      var btn=document.getElementById('cal-copy-btn');
+      var orig=btn.textContent;
+      btn.textContent='Copied!';
+      setTimeout(function(){ btn.textContent=orig; },2000);
+    });
+  }
+}
+</script>
+</body>
+</html>
